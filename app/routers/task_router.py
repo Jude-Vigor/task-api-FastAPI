@@ -1,5 +1,5 @@
 from fastapi import APIRouter, status, HTTPException, Response, Query
-from app.schemas.task_schema import TaskCreate, TaskUpdate, TaskStatus
+from app.schemas.task_schema import TaskCreate, TaskUpdate, TaskStatus, TaskResponse
 from app.services.task_service import (
     create_task,
     get_all_tasks,
@@ -7,11 +7,14 @@ from app.services.task_service import (
     update_task,
     delete_task,
 )
+from typing import List
+from app.exceptions import TaskNotFoundException
+
 
 router = APIRouter(prefix="/tasks", tags=["Tasks"])
 
 
-@router.get("/")
+@router.get("/", response_model=List[TaskResponse])
 def get_tasks(
     status: TaskStatus | None = None,
     priority: int | None = Query(None, ge=1, le=5),
@@ -23,27 +26,27 @@ def get_tasks(
     return get_all_tasks(status, priority, search, sort_by, order)
 
 
-@router.post("/", status_code=status.HTTP_201_CREATED)
+@router.post("/", status_code=status.HTTP_201_CREATED, response_model=TaskResponse)
 def add_task(task: TaskCreate):
     print("POST /tasks endpoint hit")
     return create_task(task)
 
 
-@router.get("/{task_id}")
+@router.get("/{task_id}", response_model=TaskResponse)
 def get_single_task(task_id: int):
     task = get_task_by_id(task_id)
 
     if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
+        raise TaskNotFoundException(task_id)
     return task
 
 
-@router.put("/{task_id}")
+@router.put("/{task_id}", response_model=TaskResponse)
 def update_single_task(task_id: int, task: TaskUpdate):
     updated_task = update_task(task_id, task)
 
     if not updated_task:
-        raise HTTPException(status_code=404, detail="Task not found")
+        raise TaskNotFoundException(task_id)
     return updated_task
 
 
@@ -52,6 +55,6 @@ def delete_single_task(task_id: int):
     deleted = delete_task(task_id)
 
     if not deleted:
-        raise HTTPException(status_code=404, detail="Task not found")
+        raise TaskNotFoundException(task_id)
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)

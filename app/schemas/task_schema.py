@@ -1,7 +1,7 @@
-from typing_extensions import Self
+# from typing_extensions import Self
 
 from pydantic import BaseModel, Field, field_validator, EmailStr
-from typing import Any, Optional
+from typing import Optional
 from datetime import date, datetime
 from enum import Enum
 
@@ -12,9 +12,14 @@ class TaskStatus(str, Enum):
     done = "done"
 
 
-# class UserCreate(BaseModel):
-#     email: EmailStr
-#     password: str = Field(..., min_length=8)
+class TaskResponse(BaseModel):
+    id: int
+    title: str
+    description: str | None
+    priority: int
+    status: TaskStatus
+    due_date: date
+    created_at: datetime
 
 
 class TaskBase(BaseModel):

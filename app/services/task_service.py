@@ -1,3 +1,6 @@
+from datetime import datetime
+
+
 tasks = []
 
 
@@ -9,6 +12,7 @@ def create_task(task_data):
         "status": task_data.status,
         "priority": task_data.priority,
         "due_date": task_data.due_date,
+        "created_at": datetime.utcnow(),
     }
     tasks.append(new_task)
     print("TASKS AFTER CREATE:", tasks)
@@ -33,7 +37,7 @@ def get_all_tasks(status=None, priority=None, search=None, sort_by=None, order="
         ]
     if sort_by:
         reverse = order == "desc"
-        filtered_tasks.sort(key=lambda task: task[sort_by], reverse=reverse)
+        filtered_tasks.sort(key=lambda task: task.get(sort_by), reverse=reverse)
     print("INSIDE get_all_tasks")
     return filtered_tasks
 
@@ -64,7 +68,7 @@ def delete_task(task_id: int):
     task = get_task_by_id(task_id)
 
     if not task:
-        return False
+        return None
 
     tasks.remove(task)
-    return True
+    return task
