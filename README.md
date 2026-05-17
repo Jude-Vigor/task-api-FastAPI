@@ -1,40 +1,38 @@
-# Task API (FastAPI)
+# Task API (FastAPI + PostgreSQL)
 
 ## Overview
 
-A modular Task Management API built with FastAPI that supports full CRUD operations, filtering, sorting, schema validation, and centralized error handling.
+A modular Task Management API built with FastAPI, async SQLAlchemy, PostgreSQL, and Alembic.
 
-This project demonstrates clean backend architecture using routers, schemas, services, and custom exception handling.
+The project supports task CRUD operations, filtering, search, sorting, pagination, Pydantic validation, database persistence, and centralized error handling.
 
 ---
 
 ## Features
 
 * Create tasks with validation
-* Retrieve all tasks
+* Retrieve all tasks from PostgreSQL
 * Retrieve a single task by ID
 * Update tasks
 * Delete tasks
+* Persist data after server restart
 * Filter tasks by:
-
   * status
   * priority
   * keyword search
+* Search title and description with PostgreSQL `ILIKE`
 * Sort tasks by:
-
   * id
   * title
   * priority
   * status
   * due_date
-  * created_at
+* Paginate results with `skip` and `limit`
 * Automatic validation using Pydantic
-* Custom centralized error handling using `@app.exception_handler`
-* Response model includes `created_at`
-* User input schema includes:
-
-  * `email` with `EmailStr`
-  * `password` with minimum 8 characters
+* Async database access using SQLAlchemy `AsyncSession`
+* Database migrations using Alembic
+* Centralized custom error handling
+* Response model includes database-generated `id` and `created_at`
 
 ---
 
@@ -43,6 +41,10 @@ This project demonstrates clean backend architecture using routers, schemas, ser
 * Python
 * FastAPI
 * Pydantic
+* PostgreSQL
+* SQLAlchemy async ORM
+* asyncpg
+* Alembic
 * Uvicorn
 
 ---
@@ -51,15 +53,23 @@ This project demonstrates clean backend architecture using routers, schemas, ser
 
 ```text
 app/
-├── main.py
-├── exceptions.py
-├── routers/
-│   └── task_router.py
-├── schemas/
-│   ├── task_schema.py
-│   └── user_schema.py
-├── services/
-│   └── task_service.py
+|-- main.py
+|-- database.py
+|-- models.py
+|-- exceptions.py
+|-- routers/
+|   |-- task_router.py
+|-- schemas/
+|   |-- task_schema.py
+|   |-- user_schema.py
+|-- services/
+|   |-- task_service.py
+alembic/
+|-- env.py
+|-- versions/
+|   |-- 1645d60646bf_create_tasks_table.py
+alembic.ini
+requirements.txt
 ```
 
 ---
@@ -70,7 +80,7 @@ app/
 
 ```bash
 git clone https://github.com/YOUR_USERNAME/task-api.git
-cd task-api
+cd backend_learning
 ```
 
 ### 2. Create and activate a virtual environment
@@ -83,16 +93,52 @@ venv\Scripts\activate
 ### 3. Install dependencies
 
 ```bash
-pip install requirements.txt
+pip install -r requirements.txt
 ```
 
-### 4. Run the server
+This project requires:
+
+```text
+fastapi
+uvicorn
+pydantic
+email-validator
+sqlalchemy
+asyncpg
+alembic
+```
+
+### 4. Configure PostgreSQL
+
+The current database URL is defined in `app/database.py`:
+
+```python
+DATABASE_URL = "postgresql+asyncpg://postgres:YOUR_PASSWORD@localhost:5432/fastapi_db"
+```
+
+Create a local PostgreSQL database named:
+
+```text
+fastapi_db
+```
+
+Update the username, password, host, port, or database name if your local setup is different.
+
+### 5. Run Alembic migrations
+
+```bash
+alembic upgrade head
+```
+
+This creates the `tasks` table in PostgreSQL.
+
+### 6. Run the server
 
 ```bash
 uvicorn app.main:app --reload
 ```
 
-### 5. Open the interactive docs
+### 7. Open the interactive docs
 
 ```text
 http://127.0.0.1:8000/docs
@@ -139,17 +185,30 @@ DELETE /tasks/{task_id}
 ### Filtering
 
 ```http
-GET /tasks?status=pending
-GET /tasks?priority=3
-GET /tasks?search=study
+GET /tasks/?status=pending
+GET /tasks/?priority=3
+GET /tasks/?search=study
+```
+
+### Pagination
+
+```http
+GET /tasks/?skip=0&limit=10
+GET /tasks/?skip=10&limit=10
 ```
 
 ### Sorting
 
 ```http
-GET /tasks?sort_by=due_date&order=asc
-GET /tasks?sort_by=priority&order=desc
-GET /tasks?sort_by=created_at&order=desc
+GET /tasks/?sort_by=due_date&order=asc
+GET /tasks/?sort_by=priority&order=desc
+GET /tasks/?sort_by=title&order=asc
+```
+
+Parameters can be combined:
+
+```http
+GET /tasks/?status=pending&priority=2&search=sql&sort_by=due_date&order=asc&skip=0&limit=10
 ```
 
 ---
@@ -161,7 +220,7 @@ GET /tasks?sort_by=created_at&order=desc
 * `title`: minimum 3 characters
 * `description`: optional
 * `priority`: integer between 1 and 5
-* `status`: enum (`pending`, `in_progress`, `completed`)
+* `status`: enum (`pending`, `in_progress`, `done`)
 * `due_date`: must be a future date
 
 ### TaskResponse
@@ -174,25 +233,34 @@ GET /tasks?sort_by=created_at&order=desc
 * `due_date`
 * `created_at`
 
-### UserCreate
+---
 
-* `email`: validated with `EmailStr`
-* `password`: minimum 8 characters
+## Database Model
+
+The `Task` SQLAlchemy model maps to the `tasks` table.
+
+```text
+tasks
+|-- id
+|-- title
+|-- description
+|-- status
+|-- priority
+|-- due_date
+|-- created_at
+```
+
+`created_at` is generated by the database using `server_default=func.now()`.
 
 ---
 
-## Centralized Error Handling
+## Error Handling
 
-This project uses a custom exception class and a centralized exception handler.
+This project uses custom exceptions and centralized FastAPI exception handlers.
 
-Example:
+### Not Found
 
-* `TaskNotFoundException`
-* handled globally with `@app.exception_handler(TaskNotFoundException)`
-
-This keeps route logic cleaner and ensures consistent error responses.
-
-Example error response:
+`TaskNotFoundException` returns:
 
 ```json
 {
@@ -200,21 +268,58 @@ Example error response:
 }
 ```
 
+Status code:
+
+```text
+404 Not Found
+```
+
+### Database Constraint Error
+
+`DatabaseIntegrityException` returns:
+
+```json
+{
+  "detail": "Task could not be saved because of a database constraint"
+}
+```
+
+Status code:
+
+```text
+409 Conflict
+```
+
 ---
 
 ## Status Codes
 
-* `200 OK` → successful GET and PUT
-* `201 Created` → successful POST
-* `204 No Content` → successful DELETE
-* `404 Not Found` → task not found
-* `422 Unprocessable Entity` → validation error
+* `200 OK`: successful GET and PUT
+* `201 Created`: successful POST
+* `204 No Content`: successful DELETE
+* `404 Not Found`: task not found
+* `409 Conflict`: database constraint conflict
+* `422 Unprocessable Entity`: validation error
+
+---
+
+## Mental Model
+
+```text
+Route      = receives HTTP request and dependencies
+Schema     = validates request and response data
+Service    = contains task business/database logic
+Model      = maps Python objects to database tables
+Session    = one database conversation
+Alembic    = manages database schema changes
+PostgreSQL = permanent storage
+```
 
 ---
 
 ## Notes
 
-* Data is currently stored in-memory using a Python list
-* This project is designed for learning FastAPI architecture and API design principles
-* Since there is no database yet, data resets whenever the server restarts
-* `UserCreate` is currently a schema-only requirement and is not yet connected to a user registration endpoint
+* Data is stored in PostgreSQL, not an in-memory list.
+* Data persists after the Uvicorn server restarts.
+* Alembic migrations should be run whenever the SQLAlchemy model schema changes.
+* `UserCreate` is currently a schema-only learning example and is not connected to a user registration endpoint.

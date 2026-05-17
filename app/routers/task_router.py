@@ -1,4 +1,4 @@
-from fastapi import APIRouter, status, HTTPException, Response, Query
+from fastapi import APIRouter, status, Response, Query, Depends
 from app.schemas.task_schema import TaskCreate, TaskUpdate, TaskStatus, TaskResponse
 from app.services.task_service import (
     create_task,
@@ -9,32 +9,38 @@ from app.services.task_service import (
 )
 from typing import List
 from app.exceptions import TaskNotFoundException
-
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.database import get_db
 
 router = APIRouter(prefix="/tasks", tags=["Tasks"])
 
 
 @router.get("/", response_model=List[TaskResponse])
-def get_tasks(
+async def get_tasks(
     status: TaskStatus | None = None,
     priority: int | None = Query(None, ge=1, le=5),
     search: str | None = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(10, ge=1, le=100),
     sort_by: str | None = Query(None, pattern="^(id|title|priority|status|due_date)$"),
     order: str = Query("asc", pattern="^(asc|desc)$"),
+    db: AsyncSession = Depends(get_db),
 ):
     print("GET /tasks endpoint hit")
-    return get_all_tasks(status, priority, search, sort_by, order)
+    return await get_all_tasks(
+        db, status, priority, search, skip, limit, sort_by, order
+    )
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED, response_model=TaskResponse)
-def add_task(task: TaskCreate):
+async def add_task(task: TaskCreate, db: AsyncSession = Depends(get_db)):
     print("POST /tasks endpoint hit")
-    return create_task(task)
+    return await create_task(task, db)
 
 
 @router.get("/{task_id}", response_model=TaskResponse)
-def get_single_task(task_id: int):
-    task = get_task_by_id(task_id)
+async def get_single_task(task_id: int, db: AsyncSession = Depends(get_db)):
+    task = await get_task_by_id(task_id, db)
 
     if not task:
         raise TaskNotFoundException(task_id)
@@ -42,8 +48,10 @@ def get_single_task(task_id: int):
 
 
 @router.put("/{task_id}", response_model=TaskResponse)
-def update_single_task(task_id: int, task: TaskUpdate):
-    updated_task = update_task(task_id, task)
+async def update_single_task(
+    task_id: int, task: TaskUpdate, db: AsyncSession = Depends(get_db)
+):
+    updated_task = await update_task(task_id, task, db)
 
     if not updated_task:
         raise TaskNotFoundException(task_id)
@@ -51,8 +59,8 @@ def update_single_task(task_id: int, task: TaskUpdate):
 
 
 @router.delete("/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_single_task(task_id: int):
-    deleted = delete_task(task_id)
+async def delete_single_task(task_id: int, db: AsyncSession = Depends(get_db)):
+    deleted = await delete_task(task_id, db)
 
     if not deleted:
         raise TaskNotFoundException(task_id)
