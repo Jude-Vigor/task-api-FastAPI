@@ -1,53 +1,44 @@
-# Task API (FastAPI + PostgreSQL)
+# Project Management API
 
-## Overview
+A FastAPI backend for managing users, projects, and tasks with PostgreSQL persistence.
 
-A modular Task Management API built with FastAPI, async SQLAlchemy, PostgreSQL, and Alembic.
-
-The project supports task CRUD operations, filtering, search, sorting, pagination, Pydantic validation, database persistence, and centralized error handling.
-
----
+This project started as a task CRUD API and now uses async SQLAlchemy, Alembic migrations, and relational data modeling. It includes user registration, project CRUD, task assignment, relationship loading, filtering, pagination, and seed data for testing.
 
 ## Features
 
-* Create tasks with validation
-* Retrieve all tasks from PostgreSQL
-* Retrieve a single task by ID
-* Update tasks
-* Delete tasks
-* Persist data after server restart
-* Filter tasks by:
-  * status
-  * priority
-  * keyword search
-* Search title and description with PostgreSQL `ILIKE`
-* Sort tasks by:
-  * id
-  * title
-  * priority
-  * status
-  * due_date
-* Paginate results with `skip` and `limit`
-* Automatic validation using Pydantic
-* Async database access using SQLAlchemy `AsyncSession`
-* Database migrations using Alembic
-* Centralized custom error handling
-* Response model includes database-generated `id` and `created_at`
-
----
+- User CRUD
+  - Register users
+  - List users
+  - Get user by ID
+  - Get a user's projects
+- Project CRUD
+  - Create projects
+  - List projects with `task_count`
+  - Get a project with tasks and assignee details
+  - Update projects
+  - Delete projects
+- Task CRUD
+  - Create, read, update, and delete tasks
+  - Assign tasks to users
+  - Filter by status and priority
+  - Search by title or description
+  - Sort and paginate results
+- PostgreSQL-backed persistence
+- Async SQLAlchemy database access
+- Alembic database migrations
+- Pydantic request and response validation
+- Seed script with realistic demo data
 
 ## Tech Stack
 
-* Python
-* FastAPI
-* Pydantic
-* PostgreSQL
-* SQLAlchemy async ORM
-* asyncpg
-* Alembic
-* Uvicorn
-
----
+- Python
+- FastAPI
+- Pydantic
+- PostgreSQL
+- SQLAlchemy async ORM
+- asyncpg
+- Alembic
+- Uvicorn
 
 ## Project Structure
 
@@ -57,189 +48,46 @@ app/
 |-- database.py
 |-- models.py
 |-- exceptions.py
+|-- seed.py
 |-- routers/
 |   |-- task_router.py
+|   |-- user_router.py
+|   |-- project_router.py
 |-- schemas/
 |   |-- task_schema.py
 |   |-- user_schema.py
+|   |-- project_schema.py
 |-- services/
 |   |-- task_service.py
+|   |-- user_service.py
+|   |-- project_service.py
 alembic/
 |-- env.py
 |-- versions/
-|   |-- 1645d60646bf_create_tasks_table.py
+assets/
+|-- screenshots and test evidence
 alembic.ini
 requirements.txt
-```
-
----
-
-## How to Run
-
-### 1. Clone the repository
-
-```bash
-git clone https://github.com/YOUR_USERNAME/task-api.git
-cd backend_learning
-```
-
-### 2. Create and activate a virtual environment
-
-```bash
-python -m venv venv
-venv\Scripts\activate
-```
-
-### 3. Install dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-This project requires:
-
-```text
-fastapi
-uvicorn
-pydantic
-email-validator
-sqlalchemy
-asyncpg
-alembic
-```
-
-### 4. Configure PostgreSQL
-
-The current database URL is defined in `app/database.py`:
-
-```python
-DATABASE_URL = "postgresql+asyncpg://postgres:YOUR_PASSWORD@localhost:5432/fastapi_db"
-```
-
-Create a local PostgreSQL database named:
-
-```text
-fastapi_db
-```
-
-Update the username, password, host, port, or database name if your local setup is different.
-
-### 5. Run Alembic migrations
-
-```bash
-alembic upgrade head
-```
-
-This creates the `tasks` table in PostgreSQL.
-
-### 6. Run the server
-
-```bash
-uvicorn app.main:app --reload
-```
-
-### 7. Open the interactive docs
-
-```text
-http://127.0.0.1:8000/docs
-```
-
----
-
-## API Endpoints
-
-### Create Task
-
-```http
-POST /tasks/
-```
-
-### Get All Tasks
-
-```http
-GET /tasks/
-```
-
-### Get Task by ID
-
-```http
-GET /tasks/{task_id}
-```
-
-### Update Task
-
-```http
-PUT /tasks/{task_id}
-```
-
-### Delete Task
-
-```http
-DELETE /tasks/{task_id}
-```
-
----
-
-## Query Parameters
-
-### Filtering
-
-```http
-GET /tasks/?status=pending
-GET /tasks/?priority=3
-GET /tasks/?search=study
-```
-
-### Pagination
-
-```http
-GET /tasks/?skip=0&limit=10
-GET /tasks/?skip=10&limit=10
-```
-
-### Sorting
-
-```http
-GET /tasks/?sort_by=due_date&order=asc
-GET /tasks/?sort_by=priority&order=desc
-GET /tasks/?sort_by=title&order=asc
-```
-
-Parameters can be combined:
-
-```http
-GET /tasks/?status=pending&priority=2&search=sql&sort_by=due_date&order=asc&skip=0&limit=10
-```
-
----
-
-## Task Schema Highlights
-
-### TaskCreate / TaskUpdate
-
-* `title`: minimum 3 characters
-* `description`: optional
-* `priority`: integer between 1 and 5
-* `status`: enum (`pending`, `in_progress`, `done`)
-* `due_date`: must be a future date
-
-### TaskResponse
-
-* `id`
-* `title`
-* `description`
-* `priority`
-* `status`
-* `due_date`
-* `created_at`
-
----
+README.md
+'''
 
 ## Database Model
 
-The `Task` SQLAlchemy model maps to the `tasks` table.
 
-```text
+users
+|-- id
+|-- name
+|-- email
+|-- role
+|-- created_at
+
+projects
+|-- id
+|-- name
+|-- description
+|-- owner_id -> users.id
+|-- created_at
+
 tasks
 |-- id
 |-- title
@@ -247,79 +95,256 @@ tasks
 |-- status
 |-- priority
 |-- due_date
+|-- owner_id -> users.id
+|-- project_id -> projects.id
 |-- created_at
 ```
 
-`created_at` is generated by the database using `server_default=func.now()`.
+Relationships:
 
----
+```
+User -> Projects
+User -> Assigned Tasks
+Project -> Tasks
+Task -> Assignee/User
+```
 
-## Error Handling
+## Setup
 
-This project uses custom exceptions and centralized FastAPI exception handlers.
+### 1. Clone the repository
 
-### Not Found
+```powershell
+git clone https://github.com/YOUR_USERNAME/YOUR_REPO_NAME.git
+cd backend_learning
+```
 
-`TaskNotFoundException` returns:
+### 2. Create and activate a virtual environment
+
+```powershell
+python -m venv venv
+.\venv\Scripts\activate
+```
+
+### 3. Install dependencies
+
+```powershell
+pip install -r requirements.txt
+```
+
+### 4. Create a PostgreSQL database
+
+Create a local PostgreSQL database. Example name:
+
+```
+fastapi_db
+```
+
+You can create it with pgAdmin or with `psql`:
+
+```sql
+CREATE DATABASE fastapi_db;
+```
+
+### 5. Configure environment variables
+
+Create a `.env` file in the project root:
+
+```env
+DATABASE_URL=postgresql+asyncpg://postgres:YOUR_PASSWORD@localhost:5432/fastapi_db
+DB_ECHO=false
+```
+
+Replace `postgres`, `YOUR_PASSWORD`, host, port, or database name with your local PostgreSQL settings.
+Set `DB_ECHO=true` only when you want SQLAlchemy to print SQL queries while debugging.
+
+### 6. Run migrations
+
+```powershell
+.\venv\Scripts\python.exe -m alembic upgrade head
+```
+
+This creates the database tables and relationships.
+
+### 7. Seed the database
+
+```powershell
+.\venv\Scripts\python.exe -m app.seed
+```
+
+The seed script creates realistic users, projects, and tasks. It is safe to rerun because it checks for existing seed records before creating new ones.
+
+### 8. Run the server
+
+```powershell
+.\venv\Scripts\python.exe -m uvicorn app.main:app --reload
+```
+
+Open the interactive API docs:
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+## API Endpoints
+
+### Users
+
+```http
+POST /users/register
+GET /users/
+GET /users/{user_id}
+GET /users/{user_id}/projects
+```
+
+### Projects
+
+```http
+POST /projects/
+GET /projects/
+GET /projects/{project_id}
+PUT /projects/{project_id}
+DELETE /projects/{project_id}
+```
+
+`GET /projects/` returns each project with a `task_count`.
+
+`GET /projects/{project_id}` returns the project with tasks and each task's assignee details.
+
+### Tasks
+
+```http
+POST /tasks/
+GET /tasks/
+GET /tasks/{task_id}
+PUT /tasks/{task_id}
+PATCH /tasks/{task_id}/assign
+DELETE /tasks/{task_id}
+```
+
+Task assignment request body:
 
 ```json
 {
-  "detail": "Task with id 999 not found"
+  "assignee_id": 1
 }
 ```
 
-Status code:
+## Task Query Parameters
+
+Filtering:
+
+```http
+GET /tasks/?status=pending
+GET /tasks/?priority=3
+GET /tasks/?search=api
+```
+
+Pagination:
+
+```http
+GET /tasks/?skip=0&limit=10
+```
+
+Sorting:
+
+```http
+GET /tasks/?sort_by=due_date&order=asc
+GET /tasks/?sort_by=priority&order=desc
+```
+
+Parameters can be combined:
+
+```http
+GET /tasks/?status=pending&priority=3&search=api&sort_by=due_date&order=asc&skip=0&limit=10
+```
+
+## Example Requests
+
+Create a user:
+
+```json
+{
+  "name": "Amina Bello",
+  "email": "amina@example.com"
+}
+```
+
+Create a project:
+
+```json
+{
+  "name": "Customer Portal API",
+  "description": "Backend API for customer profile and task tracking.",
+  "owner_id": 1
+}
+```
+
+Create a task:
+
+```json
+{
+  "title": "Build project endpoint",
+  "description": "Create the project detail endpoint with nested tasks.",
+  "priority": 4,
+  "status": "pending",
+  "due_date": "2026-05-30",
+  "owner_id": 1,
+  "project_id": 1
+}
+```
+
+## Validation and Error Handling
+
+- Unknown request fields are rejected for create/update schemas.
+- Duplicate user emails return `409 Conflict`.
+- Missing users, projects, or tasks return `404 Not Found`.
+- Invalid request bodies return `422 Unprocessable Entity`.
+- Database constraint problems return clear API errors where handled.
+
+Common status codes:
 
 ```text
+200 OK
+201 Created
+204 No Content
 404 Not Found
-```
-
-### Database Constraint Error
-
-`DatabaseIntegrityException` returns:
-
-```json
-{
-  "detail": "Task could not be saved because of a database constraint"
-}
-```
-
-Status code:
-
-```text
 409 Conflict
+422 Unprocessable Entity
 ```
 
----
+## Development Notes
 
-## Status Codes
+Run migrations after model changes:
 
-* `200 OK`: successful GET and PUT
-* `201 Created`: successful POST
-* `204 No Content`: successful DELETE
-* `404 Not Found`: task not found
-* `409 Conflict`: database constraint conflict
-* `422 Unprocessable Entity`: validation error
+```powershell
+.\venv\Scripts\python.exe -m alembic revision --autogenerate -m "describe change"
+.\venv\Scripts\python.exe -m alembic upgrade head
+```
 
----
+Check current migration:
 
-## Mental Model
+```powershell
+.\venv\Scripts\python.exe -m alembic current
+```
+
+Run seed data:
+
+```powershell
+.\venv\Scripts\python.exe -m app.seed
+```
+
+Run server:
+
+```powershell
+.\venv\Scripts\python.exe -m uvicorn app.main:app --reload
+```
+
+## Testing
+
+The API was tested through FastAPI's interactive docs at:
 
 ```text
-Route      = receives HTTP request and dependencies
-Schema     = validates request and response data
-Service    = contains task business/database logic
-Model      = maps Python objects to database tables
-Session    = one database conversation
-Alembic    = manages database schema changes
-PostgreSQL = permanent storage
+http://127.0.0.1:8000/docs
 ```
 
----
-
-## Notes
-
-* Data is stored in PostgreSQL, not an in-memory list.
-* Data persists after the Uvicorn server restarts.
-* Alembic migrations should be run whenever the SQLAlchemy model schema changes.
-* `UserCreate` is currently a schema-only learning example and is not connected to a user registration endpoint.
+Screenshots from endpoint testing are stored in the `assets/` folder.

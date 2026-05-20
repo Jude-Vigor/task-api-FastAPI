@@ -1,0 +1,16 @@
+1. Validate request body shape
+   title, priority, status, due_date, owner_id, project_id all exist.
+
+2. Check Pydantic validation
+   due_date is future, priority is 1-5, status is valid.
+
+3. Check database constraints
+   owner_id must exist in users.id.
+   project_id must exist in projects.id.
+
+4. Found issue
+   owner_id=3 exists.
+   project_id=2 does not exist.
+
+5. Conclusion
+   Foreign key constraint failure.
