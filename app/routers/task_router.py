@@ -1,6 +1,13 @@
-from fastapi import APIRouter, status, Response, Query, Depends
-from app.schemas.task_schema import TaskCreate, TaskUpdate, TaskStatus, TaskResponse
+from fastapi import APIRouter, status, Response, Query, Depends, HTTPException
+from app.schemas.task_schema import (
+    TaskAssign,
+    TaskCreate,
+    TaskUpdate,
+    TaskStatus,
+    TaskResponse,
+)
 from app.services.task_service import (
+    assign_task,
     create_task,
     get_all_tasks,
     get_task_by_id,
@@ -26,7 +33,6 @@ async def get_tasks(
     order: str = Query("asc", pattern="^(asc|desc)$"),
     db: AsyncSession = Depends(get_db),
 ):
-    print("GET /tasks endpoint hit")
     return await get_all_tasks(
         db, status, priority, search, skip, limit, sort_by, order
     )
@@ -34,8 +40,21 @@ async def get_tasks(
 
 @router.post("/", status_code=status.HTTP_201_CREATED, response_model=TaskResponse)
 async def add_task(task: TaskCreate, db: AsyncSession = Depends(get_db)):
-    print("POST /tasks endpoint hit")
-    return await create_task(task, db)
+    created_task, error = await create_task(task, db)
+
+    if error == "owner_not_found":
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"User with id {task.owner_id} not found",
+        )
+
+    if error == "project_not_found":
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Project with id {task.project_id} not found",
+        )
+
+    return created_task
 
 
 @router.get("/{task_id}", response_model=TaskResponse)
@@ -56,6 +75,26 @@ async def update_single_task(
     if not updated_task:
         raise TaskNotFoundException(task_id)
     return updated_task
+
+
+@router.patch("/{task_id}/assign", response_model=TaskResponse)
+async def assign_single_task(
+    task_id: int,
+    assignment_data: TaskAssign,
+    db: AsyncSession = Depends(get_db),
+):
+    assigned_task, error = await assign_task(task_id, assignment_data, db)
+
+    if error == "task_not_found":
+        raise TaskNotFoundException(task_id)
+
+    if error == "assignee_not_found":
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"User with id {assignment_data.assignee_id} not found",
+        )
+
+    return assigned_task
 
 
 @router.delete("/{task_id}", status_code=status.HTTP_204_NO_CONTENT)

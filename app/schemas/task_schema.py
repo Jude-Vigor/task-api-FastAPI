@@ -1,9 +1,11 @@
 # from typing_extensions import Self
 
-from pydantic import BaseModel, Field, field_validator, EmailStr
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import Optional
 from datetime import date, datetime
 from enum import Enum
+
+from app.schemas.user_schema import UserResponse
 
 
 class TaskStatus(str, Enum):
@@ -19,7 +21,13 @@ class TaskResponse(BaseModel):
     priority: int
     status: TaskStatus
     due_date: date
+    owner_id: int
+    project_id: int
     created_at: datetime
+
+
+class TaskWithAssigneeResponse(TaskResponse):
+    assignee: UserResponse
 
 
 class TaskBase(BaseModel):
@@ -45,13 +53,18 @@ class TaskUpdate(TaskBase):
 
 
 class TaskCreate(TaskBase):
-    pass
+    # Reject unknown request fields instead of silently ignoring them.
+    model_config = ConfigDict(extra="forbid")
+
+    owner_id: int = Field(..., ge=1)
+    project_id: int = Field(..., ge=1)
 
 
-# Instead of rewriting everything, we inherit from TaskCreate schema, then add id and created_at fields(DRY)
-# class TaskResponse(TaskCreate):
-#     id: int
-#     created_at: datetime.utcnow()
+class TaskAssign(BaseModel):
+    # Reject unknown request fields instead of silently ignoring them.
+    model_config = ConfigDict(extra="forbid")
+
+    assignee_id: int = Field(..., ge=1)
 
 
 # Incoming JSON
