@@ -348,3 +348,29 @@ http://127.0.0.1:8000/docs
 ```
 
 Screenshots from endpoint testing are stored in the `assets/` folder.
+
+## A few sample Screenshots
+
+### User Endpoints
+
+![Register user](assets/user_endpoints/users-register.png)
+
+![List users](assets/user_endpoints/get-users.png)
+
+### Project Endpoints
+
+![Create project](assets/project_endpoints/post-project.png)
+
+![Get project by ID](assets/project_endpoints/get_project_by_id.png)
+
+### Task Endpoints
+
+![Create task](assets/task_endpoints/post_task_success.png)
+
+![Assign task](assets/task_endpoints/patch_task_id_assignee.png)
+
+### Error Cases
+
+![Duplicate email error](assets/test_error_cases/post_user_existing_email.png)
+
+![Task project error](assets/test_error_cases/post_task_error.png)
