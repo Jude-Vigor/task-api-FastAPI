@@ -367,10 +367,8 @@ Screenshots from endpoint testing are stored in the `assets/` folder.
 
 ![Create task](assets/task_endpoints/post_task_success.png)
 
-![Assign task](assets/task_endpoints/patch_task_id_assignee.png)
 
 ### Error Cases
 
 ![Duplicate email error](assets/test_error_cases/post_user_existing_email.png)
 
-![Task project error](assets/test_error_cases/post_task_error.png)
