@@ -5,12 +5,14 @@ from sqlalchemy.orm import selectinload
 
 from app.models import User
 from app.schemas.user_schema import UserCreate
+from app.auth.security import hash_password
 
 
 async def create_user(user_data: UserCreate, db: AsyncSession) -> User:
     new_user = User(
         name=user_data.name,
         email=user_data.email,
+        password_hash=hash_password(user_data.password),
     )
 
     try:
@@ -40,8 +42,6 @@ async def get_user_by_id(user_id: int, db: AsyncSession) -> User | None:
 
 async def get_user_with_projects(user_id: int, db: AsyncSession) -> User | None:
     result = await db.execute(
-        select(User)
-        .options(selectinload(User.projects))
-        .where(User.id == user_id)
+        select(User).options(selectinload(User.projects)).where(User.id == user_id)
     )
     return result.scalar_one_or_none()

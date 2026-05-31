@@ -1,4 +1,4 @@
-from pydantic import EmailStr, BaseModel, Field, ConfigDict
+from pydantic import EmailStr, BaseModel, Field, field_validator, ConfigDict
 from datetime import datetime
 
 
@@ -8,6 +8,19 @@ class UserCreate(BaseModel):
 
     name: str = Field(..., min_length=3, max_length=80)
     email: EmailStr
+    password: str
+
+    @field_validator("password")
+    def validate_password(cls, pwd: str):
+        if len(pwd) < 8:
+            raise ValueError("Password must be at least 8 characters")
+        if not any(char.isdigit() for char in pwd):
+            raise ValueError("Password must contain at least one number")
+        return pwd
+
+    @field_validator("email")
+    def normalize_email(cls, v):
+        return v.lower()
 
 
 class UserResponse(BaseModel):
@@ -16,3 +29,6 @@ class UserResponse(BaseModel):
     email: str
     role: str
     created_at: datetime
+
+    class Config:
+        from_attributes = True

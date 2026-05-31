@@ -1,11 +1,9 @@
 from fastapi import APIRouter, status, HTTPException, Depends, Query
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.schemas.project_schema import ProjectResponse
-from app.schemas.user_schema import UserCreate, UserResponse
+from app.schemas.user_schema import UserResponse
 from app.services.user_service import (
-    create_user,
     get_all_users,
     get_user_by_id,
     get_user_with_projects,
@@ -13,19 +11,6 @@ from app.services.user_service import (
 from typing import List
 
 router = APIRouter(prefix="/users", tags=["Users"])
-
-
-@router.post(
-    "/register", status_code=status.HTTP_201_CREATED, response_model=UserResponse
-)
-async def register_user(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
-    try:
-        return await create_user(user_data, db)
-    except IntegrityError:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="A user with this email already exists",
-        )
 
 
 @router.get("/", response_model=List[UserResponse])
