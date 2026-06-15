@@ -32,3 +32,17 @@ class UserResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+    @field_validator("email")
+    def normalize_email(cls, v):
+        return v.lower()
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str

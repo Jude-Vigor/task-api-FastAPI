@@ -18,6 +18,8 @@ from typing import List
 from app.exceptions import TaskNotFoundException
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
+from app.auth.dependencies import get_current_user
+from app.models import User
 
 router = APIRouter(prefix="/tasks", tags=["Tasks"])
 
@@ -32,20 +34,25 @@ async def get_tasks(
     sort_by: str | None = Query(None, pattern="^(id|title|priority|status|due_date)$"),
     order: str = Query("asc", pattern="^(asc|desc)$"),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     return await get_all_tasks(
-        db, status, priority, search, skip, limit, sort_by, order
+        db, current_user.id, status, priority, search, skip, limit, sort_by, order
     )
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED, response_model=TaskResponse)
-async def add_task(task: TaskCreate, db: AsyncSession = Depends(get_db)):
-    created_task, error = await create_task(task, db)
+async def add_task(
+    task: TaskCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    created_task, error = await create_task(task, db, current_user.id)
 
     if error == "owner_not_found":
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"User with id {task.owner_id} not found",
+            detail="Authenticated user not found",
         )
 
     if error == "project_not_found":
@@ -58,8 +65,12 @@ async def add_task(task: TaskCreate, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/{task_id}", response_model=TaskResponse)
-async def get_single_task(task_id: int, db: AsyncSession = Depends(get_db)):
-    task = await get_task_by_id(task_id, db)
+async def get_single_task(
+    task_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    task = await get_task_by_id(task_id, db, current_user.id)
 
     if not task:
         raise TaskNotFoundException(task_id)
@@ -68,9 +79,12 @@ async def get_single_task(task_id: int, db: AsyncSession = Depends(get_db)):
 
 @router.put("/{task_id}", response_model=TaskResponse)
 async def update_single_task(
-    task_id: int, task: TaskUpdate, db: AsyncSession = Depends(get_db)
+    task_id: int,
+    task: TaskUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    updated_task = await update_task(task_id, task, db)
+    updated_task = await update_task(task_id, task, db, current_user.id)
 
     if not updated_task:
         raise TaskNotFoundException(task_id)
@@ -82,8 +96,11 @@ async def assign_single_task(
     task_id: int,
     assignment_data: TaskAssign,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    assigned_task, error = await assign_task(task_id, assignment_data, db)
+    assigned_task, error = await assign_task(
+        task_id, assignment_data, db, current_user.id
+    )
 
     if error == "task_not_found":
         raise TaskNotFoundException(task_id)
@@ -98,8 +115,12 @@ async def assign_single_task(
 
 
 @router.delete("/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_single_task(task_id: int, db: AsyncSession = Depends(get_db)):
-    deleted = await delete_task(task_id, db)
+async def delete_single_task(
+    task_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    deleted = await delete_task(task_id, db, current_user.id)
 
     if not deleted:
         raise TaskNotFoundException(task_id)

@@ -11,7 +11,6 @@ class ProjectCreate(BaseModel):
 
     name: str = Field(..., min_length=3, max_length=120)
     description: str | None = Field(None, max_length=500)
-    owner_id: int = Field(..., ge=1)
 
 
 class ProjectUpdate(BaseModel):

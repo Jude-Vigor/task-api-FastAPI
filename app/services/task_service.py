@@ -9,8 +9,9 @@ from app.exceptions import DatabaseIntegrityException
 async def create_task(
     task_data: TaskCreate,
     db: AsyncSession,
+    owner_id: int,
 ) -> tuple[Task | None, str | None]:
-    owner_result = await db.execute(select(User).where(User.id == task_data.owner_id))
+    owner_result = await db.execute(select(User).where(User.id == owner_id))
     owner = owner_result.scalar_one_or_none()
 
     if not owner:
@@ -30,7 +31,7 @@ async def create_task(
         status=task_data.status.value,
         priority=task_data.priority,
         due_date=task_data.due_date,
-        owner_id=task_data.owner_id,
+        owner_id=owner_id,
         project_id=task_data.project_id,
     )
     try:
@@ -47,6 +48,7 @@ async def create_task(
 
 async def get_all_tasks(
     db: AsyncSession,
+    owner_id: int,
     status=None,
     priority=None,
     search=None,
@@ -55,7 +57,7 @@ async def get_all_tasks(
     sort_by=None,
     order: str = "asc",
 ):
-    query = select(Task)
+    query = select(Task).where(Task.owner_id == owner_id)
 
     if status:
         query = query.where(Task.status == status.value)
@@ -87,13 +89,17 @@ async def get_all_tasks(
     return result.scalars().all()
 
 
-async def get_task_by_id(task_id: int, db: AsyncSession):
-    result = await db.execute(select(Task).where(Task.id == task_id))
+async def get_task_by_id(task_id: int, db: AsyncSession, owner_id: int):
+    result = await db.execute(
+        select(Task).where(Task.id == task_id, Task.owner_id == owner_id)
+    )
     return result.scalar_one_or_none()
 
 
-async def update_task(task_id: int, task_data: TaskUpdate, db: AsyncSession):
-    task = await get_task_by_id(task_id, db)
+async def update_task(
+    task_id: int, task_data: TaskUpdate, db: AsyncSession, owner_id: int
+):
+    task = await get_task_by_id(task_id, db, owner_id)
 
     if not task:
         return None
@@ -116,8 +122,8 @@ async def update_task(task_id: int, task_data: TaskUpdate, db: AsyncSession):
     return task
 
 
-async def delete_task(task_id: int, db: AsyncSession):
-    task = await get_task_by_id(task_id, db)
+async def delete_task(task_id: int, db: AsyncSession, owner_id: int):
+    task = await get_task_by_id(task_id, db, owner_id)
 
     if not task:
         return None
@@ -133,11 +139,9 @@ async def delete_task(task_id: int, db: AsyncSession):
 
 
 async def assign_task(
-    task_id: int,
-    assignment_data: TaskAssign,
-    db: AsyncSession,
+    task_id: int, assignment_data: TaskAssign, db: AsyncSession, owner_id: int
 ) -> tuple[Task | None, str | None]:
-    task = await get_task_by_id(task_id, db)
+    task = await get_task_by_id(task_id, db, owner_id)
 
     if not task:
         return None, "task_not_found"

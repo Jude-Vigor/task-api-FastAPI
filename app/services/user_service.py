@@ -40,6 +40,11 @@ async def get_user_by_id(user_id: int, db: AsyncSession) -> User | None:
     return result.scalar_one_or_none()
 
 
+async def get_user_by_email(email: str, db: AsyncSession) -> User | None:
+    result = await db.execute(select(User).where(User.email == email.lower()))
+    return result.scalar_one_or_none()
+
+
 async def get_user_with_projects(user_id: int, db: AsyncSession) -> User | None:
     result = await db.execute(
         select(User).options(selectinload(User.projects)).where(User.id == user_id)

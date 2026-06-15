@@ -56,7 +56,6 @@ class TaskCreate(TaskBase):
     # Reject unknown request fields instead of silently ignoring them.
     model_config = ConfigDict(extra="forbid")
 
-    owner_id: int = Field(..., ge=1)
     project_id: int = Field(..., ge=1)
 
 

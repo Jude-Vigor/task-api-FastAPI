@@ -10,10 +10,9 @@ from app.schemas.project_schema import ProjectCreate, ProjectUpdate
 async def create_project(
     project_data: ProjectCreate,
     db: AsyncSession,
+    owner_id: int,
 ) -> Project | None:
-    owner_result = await db.execute(
-        select(User).where(User.id == project_data.owner_id)
-    )
+    owner_result = await db.execute(select(User).where(User.id == owner_id))
     owner = owner_result.scalar_one_or_none()
 
     if not owner:
@@ -22,7 +21,7 @@ async def create_project(
     new_project = Project(
         name=project_data.name,
         description=project_data.description,
-        owner_id=project_data.owner_id,
+        owner_id=owner_id,
     )
 
     try:
