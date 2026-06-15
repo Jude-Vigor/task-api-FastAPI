@@ -4,9 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.dependencies import get_current_user
+from app.auth.dependencies import get_current_user, require_role
 from app.database import get_db
 from app.models import User
+from app.schemas.user_schema import UserRole
 from app.schemas.project_schema import (
     ProjectCreate,
     ProjectResponse,
@@ -52,10 +53,10 @@ async def add_project(
 async def delete_single_project(
     project_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(UserRole.admin, UserRole.manager)),
 ):
     try:
-        project = await delete_project(project_id, db)
+        project = await delete_project(project_id, db, current_user)
     except IntegrityError:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,

@@ -5,6 +5,7 @@ from sqlalchemy.orm import selectinload
 
 from app.models import Project, Task, User
 from app.schemas.project_schema import ProjectCreate, ProjectUpdate
+from app.schemas.user_schema import UserRole
 
 
 async def create_project(
@@ -134,10 +135,17 @@ async def update_project(
     return project
 
 
-async def delete_project(project_id: int, db: AsyncSession) -> Project | None:
+async def delete_project(
+    project_id: int,
+    db: AsyncSession,
+    current_user: User,
+) -> Project | None:
     project = await get_project_by_id(project_id, db)
 
     if not project:
+        return None
+
+    if current_user.role != UserRole.admin and project.owner_id != current_user.id:
         return None
 
     try:

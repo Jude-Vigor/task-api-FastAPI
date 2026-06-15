@@ -6,12 +6,11 @@ from sqlalchemy import select
 from app.database import AsyncSessionLocal
 from app.models import Project, Task, User
 
-
 USERS = [
-    {"name": "Amina Bello", "email": "amina.bello@example.com", "role": "user"},
-    {"name": "Ben Carter", "email": "ben.carter@example.com", "role": "user"},
+    {"name": "Amina Bello", "email": "amina.bello@example.com", "role": "member"},
+    {"name": "Ben Carter", "email": "ben.carter@example.com", "role": "member"},
     {"name": "Chloe Singh", "email": "chloe.singh@example.com", "role": "manager"},
-    {"name": "Diego Ramos", "email": "diego.ramos@example.com", "role": "user"},
+    {"name": "Diego Ramos", "email": "diego.ramos@example.com", "role": "member"},
 ]
 
 PROJECTS = [

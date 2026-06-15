@@ -1,5 +1,6 @@
 from pydantic import EmailStr, BaseModel, Field, field_validator, ConfigDict
 from datetime import datetime
+from enum import Enum
 
 
 class UserCreate(BaseModel):
@@ -23,11 +24,17 @@ class UserCreate(BaseModel):
         return v.lower()
 
 
+class UserRole(str, Enum):
+    admin = "admin"
+    manager = "manager"
+    member = "member"
+
+
 class UserResponse(BaseModel):
     id: int
     name: str
     email: str
-    role: str
+    role: UserRole
     created_at: datetime
 
     class Config:

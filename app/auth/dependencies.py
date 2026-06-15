@@ -5,6 +5,7 @@ from app.auth.security import oauth2_scheme, verify_token
 from app.database import get_db
 from app.models import User
 from app.services.user_service import get_user_by_id
+from app.schemas.user_schema import UserRole
 
 
 async def get_current_user(
@@ -30,3 +31,14 @@ async def get_current_user(
         raise credentials_exception
 
     return user
+
+
+def require_role(*allowed_roles: UserRole):
+    async def role_checker(current_user: User = Depends(get_current_user)) -> User:
+        if current_user.role not in allowed_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail="Not permitted"
+            )
+        return current_user
+
+    return role_checker
