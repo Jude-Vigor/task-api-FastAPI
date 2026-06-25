@@ -9,3 +9,9 @@ class DatabaseIntegrityException(Exception):
     def __init__(self, message: str = "Database constraint violation"):
         self.message = message
         super().__init__(self.message)
+
+
+class AuthorizationException(Exception):
+    def __init__(self, message: str = "Not permitted"):
+        self.message = message
+        super().__init__(self.message)

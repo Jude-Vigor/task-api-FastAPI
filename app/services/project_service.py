@@ -6,6 +6,7 @@ from sqlalchemy.orm import selectinload
 from app.models import Project, Task, User
 from app.schemas.project_schema import ProjectCreate, ProjectUpdate
 from app.schemas.user_schema import UserRole
+from app.exceptions import AuthorizationException
 
 
 async def create_project(
@@ -116,11 +117,15 @@ async def update_project(
     project_id: int,
     project_data: ProjectUpdate,
     db: AsyncSession,
+    current_user: User,
 ) -> Project | None:
     project = await get_project_by_id(project_id, db)
 
     if not project:
         return None
+
+    if current_user.role != UserRole.admin and project.owner_id != current_user.id:
+        raise AuthorizationException()
 
     project.name = project_data.name
     project.description = project_data.description
@@ -146,7 +151,7 @@ async def delete_project(
         return None
 
     if current_user.role != UserRole.admin and project.owner_id != current_user.id:
-        return None
+        raise AuthorizationException()
 
     try:
         await db.delete(project)

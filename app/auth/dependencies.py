@@ -6,6 +6,7 @@ from app.database import get_db
 from app.models import User
 from app.services.user_service import get_user_by_id
 from app.schemas.user_schema import UserRole
+from app.auth.permissions import Action, PERMISSIONS, Resource
 
 
 async def get_current_user(
@@ -42,3 +43,21 @@ def require_role(*allowed_roles: UserRole):
         return current_user
 
     return role_checker
+
+
+def require_permission(resource: Resource, action: Action):
+    async def permission_checker(
+        current_user: User = Depends(get_current_user),
+    ) -> User:
+        role = UserRole(current_user.role)
+        allowed_actions = PERMISSIONS.get(role, {}).get(resource, set())
+
+        if action not in allowed_actions:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not permitted",
+            )
+
+        return current_user
+
+    return permission_checker

@@ -3,6 +3,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.schemas.project_schema import ProjectResponse
 from app.schemas.user_schema import UserResponse
+from app.auth.dependencies import require_permission
+from app.auth.permissions import Action, Resource
+from app.models import User
 from app.services.user_service import (
     get_all_users,
     get_user_by_id,
@@ -18,6 +21,7 @@ async def get_users(
     skip: int = Query(0, ge=0),
     limit: int = Query(10, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_permission(Resource.users, Action.read)),
 ):
     return await get_all_users(db, skip, limit)
 
@@ -26,6 +30,7 @@ async def get_users(
 async def get_single_user(
     user_id: int,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_permission(Resource.users, Action.read)),
 ):
     user = await get_user_by_id(user_id, db)
 
@@ -42,6 +47,7 @@ async def get_single_user(
 async def get_projects_for_user(
     user_id: int,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_permission(Resource.users, Action.read)),
 ):
     user = await get_user_with_projects(user_id, db)
 

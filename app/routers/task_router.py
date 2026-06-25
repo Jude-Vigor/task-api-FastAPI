@@ -18,7 +18,8 @@ from typing import List
 from app.exceptions import TaskNotFoundException
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
-from app.auth.dependencies import get_current_user
+from app.auth.dependencies import require_permission
+from app.auth.permissions import Action, Resource
 from app.models import User
 
 router = APIRouter(prefix="/tasks", tags=["Tasks"])
@@ -34,7 +35,7 @@ async def get_tasks(
     sort_by: str | None = Query(None, pattern="^(id|title|priority|status|due_date)$"),
     order: str = Query("asc", pattern="^(asc|desc)$"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission(Resource.tasks, Action.read)),
 ):
     return await get_all_tasks(
         db, current_user.id, status, priority, search, skip, limit, sort_by, order
@@ -45,7 +46,7 @@ async def get_tasks(
 async def add_task(
     task: TaskCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission(Resource.tasks, Action.create)),
 ):
     created_task, error = await create_task(task, db, current_user.id)
 
@@ -68,7 +69,7 @@ async def add_task(
 async def get_single_task(
     task_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission(Resource.tasks, Action.read)),
 ):
     task = await get_task_by_id(task_id, db, current_user.id)
 
@@ -82,7 +83,7 @@ async def update_single_task(
     task_id: int,
     task: TaskUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission(Resource.tasks, Action.update)),
 ):
     updated_task = await update_task(task_id, task, db, current_user.id)
 
@@ -96,7 +97,7 @@ async def assign_single_task(
     task_id: int,
     assignment_data: TaskAssign,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission(Resource.tasks, Action.assign)),
 ):
     assigned_task, error = await assign_task(
         task_id, assignment_data, db, current_user.id
@@ -118,7 +119,7 @@ async def assign_single_task(
 async def delete_single_task(
     task_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission(Resource.tasks, Action.delete)),
 ):
     deleted = await delete_task(task_id, db, current_user.id)
 
