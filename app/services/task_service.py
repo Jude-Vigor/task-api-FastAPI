@@ -3,7 +3,43 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import Project, Task, User
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select, or_
-from app.exceptions import DatabaseIntegrityException
+from app.exceptions import AuthorizationException, DatabaseIntegrityException
+from app.schemas.user_schema import UserRole
+
+
+def _role(user: User) -> UserRole:
+    return UserRole(user.role)
+
+
+async def _can_access_task(
+    task: Task, current_user: User, db: AsyncSession
+) -> bool:
+    role = _role(current_user)
+    if role == UserRole.admin:
+        return True
+    if role == UserRole.member:
+        return task.owner_id == current_user.id
+
+    project_result = await db.execute(
+        select(Project).where(Project.id == task.project_id)
+    )
+    project = project_result.scalar_one_or_none()
+    return project is not None and project.owner_id == current_user.id
+
+
+async def _get_task_if_allowed(
+    task_id: int, db: AsyncSession, current_user: User
+) -> Task | None:
+    result = await db.execute(select(Task).where(Task.id == task_id))
+    task = result.scalar_one_or_none()
+
+    if not task:
+        return None
+
+    if not await _can_access_task(task, current_user, db):
+        raise AuthorizationException()
+
+    return task
 
 
 async def create_task(
@@ -48,7 +84,7 @@ async def create_task(
 
 async def get_all_tasks(
     db: AsyncSession,
-    owner_id: int,
+    current_user: User,
     status=None,
     priority=None,
     search=None,
@@ -57,7 +93,18 @@ async def get_all_tasks(
     sort_by=None,
     order: str = "asc",
 ):
-    query = select(Task).where(Task.owner_id == owner_id)
+    role = _role(current_user)
+
+    if role == UserRole.admin:
+        query = select(Task)
+    elif role == UserRole.manager:
+        query = (
+            select(Task)
+            .join(Project, Task.project_id == Project.id)
+            .where(Project.owner_id == current_user.id)
+        )
+    else:
+        query = select(Task).where(Task.owner_id == current_user.id)
 
     if status:
         query = query.where(Task.status == status.value)
@@ -89,17 +136,14 @@ async def get_all_tasks(
     return result.scalars().all()
 
 
-async def get_task_by_id(task_id: int, db: AsyncSession, owner_id: int):
-    result = await db.execute(
-        select(Task).where(Task.id == task_id, Task.owner_id == owner_id)
-    )
-    return result.scalar_one_or_none()
+async def get_task_by_id(task_id: int, db: AsyncSession, current_user: User):
+    return await _get_task_if_allowed(task_id, db, current_user)
 
 
 async def update_task(
-    task_id: int, task_data: TaskUpdate, db: AsyncSession, owner_id: int
+    task_id: int, task_data: TaskUpdate, db: AsyncSession, current_user: User
 ):
-    task = await get_task_by_id(task_id, db, owner_id)
+    task = await _get_task_if_allowed(task_id, db, current_user)
 
     if not task:
         return None
@@ -122,8 +166,8 @@ async def update_task(
     return task
 
 
-async def delete_task(task_id: int, db: AsyncSession, owner_id: int):
-    task = await get_task_by_id(task_id, db, owner_id)
+async def delete_task(task_id: int, db: AsyncSession, current_user: User):
+    task = await _get_task_if_allowed(task_id, db, current_user)
 
     if not task:
         return None
@@ -139,9 +183,12 @@ async def delete_task(task_id: int, db: AsyncSession, owner_id: int):
 
 
 async def assign_task(
-    task_id: int, assignment_data: TaskAssign, db: AsyncSession, owner_id: int
+    task_id: int,
+    assignment_data: TaskAssign,
+    db: AsyncSession,
+    current_user: User,
 ) -> tuple[Task | None, str | None]:
-    task = await get_task_by_id(task_id, db, owner_id)
+    task = await _get_task_if_allowed(task_id, db, current_user)
 
     if not task:
         return None, "task_not_found"

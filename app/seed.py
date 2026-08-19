@@ -3,10 +3,18 @@ from datetime import date, timedelta
 
 from sqlalchemy import select
 
+from app.auth.security import hash_password
 from app.database import AsyncSessionLocal
 from app.models import Project, Task, User
 
+SEED_PASSWORD = "Password1"
+
 USERS = [
+    {
+        "name": "Admin User",
+        "email": "admin@example.com",
+        "role": "admin",
+    },
     {"name": "Amina Bello", "email": "amina.bello@example.com", "role": "member"},
     {"name": "Ben Carter", "email": "ben.carter@example.com", "role": "member"},
     {"name": "Chloe Singh", "email": "chloe.singh@example.com", "role": "manager"},
@@ -102,10 +110,19 @@ async def get_or_create_user(db, user_data: dict) -> User:
     result = await db.execute(select(User).where(User.email == user_data["email"]))
     user = result.scalar_one_or_none()
 
+    password_hash = hash_password(SEED_PASSWORD)
+
     if user:
+        if not user.password_hash:
+            user.password_hash = password_hash
         return user
 
-    user = User(**user_data)
+    user = User(
+        name=user_data["name"],
+        email=user_data["email"],
+        role=user_data["role"],
+        password_hash=password_hash,
+    )
     db.add(user)
     await db.flush()
     return user
@@ -179,6 +196,7 @@ async def seed_database() -> None:
         print(f"Users available: {len(users_by_email)}")
         print(f"Projects available: {len(projects_by_name)}")
         print(f"New tasks created: {created_task_count}")
+        print(f"All seed users password: {SEED_PASSWORD}")
 
 
 if __name__ == "__main__":

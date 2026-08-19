@@ -18,8 +18,9 @@ from typing import List
 from app.exceptions import TaskNotFoundException
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
-from app.auth.dependencies import require_permission
+from app.auth.dependencies import require_permission, require_role
 from app.auth.permissions import Action, Resource
+from app.schemas.user_schema import UserRole
 from app.models import User
 
 router = APIRouter(prefix="/tasks", tags=["Tasks"])
@@ -38,7 +39,7 @@ async def get_tasks(
     current_user: User = Depends(require_permission(Resource.tasks, Action.read)),
 ):
     return await get_all_tasks(
-        db, current_user.id, status, priority, search, skip, limit, sort_by, order
+        db, current_user, status, priority, search, skip, limit, sort_by, order
     )
 
 
@@ -71,7 +72,7 @@ async def get_single_task(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_permission(Resource.tasks, Action.read)),
 ):
-    task = await get_task_by_id(task_id, db, current_user.id)
+    task = await get_task_by_id(task_id, db, current_user)
 
     if not task:
         raise TaskNotFoundException(task_id)
@@ -85,7 +86,7 @@ async def update_single_task(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_permission(Resource.tasks, Action.update)),
 ):
-    updated_task = await update_task(task_id, task, db, current_user.id)
+    updated_task = await update_task(task_id, task, db, current_user)
 
     if not updated_task:
         raise TaskNotFoundException(task_id)
@@ -98,9 +99,10 @@ async def assign_single_task(
     assignment_data: TaskAssign,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_permission(Resource.tasks, Action.assign)),
+    _: User = Depends(require_role(UserRole.admin, UserRole.manager)),
 ):
     assigned_task, error = await assign_task(
-        task_id, assignment_data, db, current_user.id
+        task_id, assignment_data, db, current_user
     )
 
     if error == "task_not_found":
@@ -121,7 +123,7 @@ async def delete_single_task(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_permission(Resource.tasks, Action.delete)),
 ):
-    deleted = await delete_task(task_id, db, current_user.id)
+    deleted = await delete_task(task_id, db, current_user)
 
     if not deleted:
         raise TaskNotFoundException(task_id)

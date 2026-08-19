@@ -42,6 +42,6 @@ PERMISSIONS: dict[UserRole, dict[Resource, set[Action]]] = {
     UserRole.member: {
         Resource.users: {Action.read},
         Resource.projects: {Action.read},
-        Resource.tasks: {Action.create, Action.read, Action.update, Action.delete},
+        Resource.tasks: {Action.create, Action.read, Action.update},
     },
 }

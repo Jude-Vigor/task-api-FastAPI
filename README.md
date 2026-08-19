@@ -1,16 +1,24 @@
 # Project Management API
 
-A FastAPI backend for managing users, projects, and tasks with PostgreSQL persistence.
+A FastAPI backend for managing users, projects, and tasks with PostgreSQL persistence and JWT-based authentication.
 
-This project started as a task CRUD API and now uses async SQLAlchemy, Alembic migrations, and relational data modeling. It includes user registration, project CRUD, task assignment, relationship loading, filtering, pagination, and seed data for testing.
+This project started as a task CRUD API and now uses async SQLAlchemy, Alembic migrations, relational data modeling, JWT access tokens, refresh-token rotation, role-based access control, rate limiting, and CORS configuration.
 
 ## Features
 
 - User CRUD
-  - Register users
   - List users
   - Get user by ID
   - Get a user's projects
+- Auth and security
+  - Register and login users
+  - Short-lived JWT access tokens
+  - Long-lived refresh tokens stored as hashes
+  - Refresh-token rotation
+  - Logout by revoking refresh tokens
+  - Role-based access control
+  - Auth endpoint rate limiting
+  - CORS restricted to configured frontend origins
 - Project CRUD
   - Create projects
   - List projects with `task_count`
@@ -39,6 +47,9 @@ This project started as a task CRUD API and now uses async SQLAlchemy, Alembic m
 - asyncpg
 - Alembic
 - Uvicorn
+- JWT
+- Passlib bcrypt
+- SlowAPI
 
 ## Project Structure
 
@@ -49,7 +60,13 @@ app/
 |-- models.py
 |-- exceptions.py
 |-- seed.py
+|-- rate_limit.py
+|-- auth/
+|   |-- dependencies.py
+|   |-- permissions.py
+|   |-- security.py
 |-- routers/
+|   |-- auth_router.py
 |   |-- task_router.py
 |   |-- user_router.py
 |   |-- project_router.py
@@ -69,7 +86,7 @@ assets/
 alembic.ini
 requirements.txt
 README.md
-'''
+```
 
 ## Database Model
 
@@ -78,6 +95,7 @@ users
 |-- id
 |-- name
 |-- email
+|-- password_hash
 |-- role
 |-- created_at
 
@@ -97,6 +115,13 @@ tasks
 |-- due_date
 |-- owner_id -> users.id
 |-- project_id -> projects.id
+|-- created_at
+
+refresh_tokens
+|-- id
+|-- user_id -> users.id
+|-- token_hash
+|-- expires_at
 |-- created_at
 ```
 
@@ -152,10 +177,16 @@ Create a `.env` file in the project root:
 ```env
 DATABASE_URL=postgresql+asyncpg://postgres:YOUR_PASSWORD@localhost:5432/fastapi_db
 DB_ECHO=false
+JWT_SECRET_KEY=replace_with_a_long_random_secret
+JWT_ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=15
+REFRESH_TOKEN_EXPIRE_DAYS=7
+FRONTEND_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
 ```
 
 Replace `postgres`, `YOUR_PASSWORD`, host, port, or database name with your local PostgreSQL settings.
 Set `DB_ECHO=true` only when you want SQLAlchemy to print SQL queries while debugging.
+Use a strong `JWT_SECRET_KEY` in production.
 
 ### 6. Run migrations
 
@@ -173,6 +204,22 @@ This creates the database tables and relationships.
 
 The seed script creates realistic users, projects, and tasks. It is safe to rerun because it checks for existing seed records before creating new ones.
 
+Seed accounts:
+
+```text
+admin@example.com          role: admin
+chloe.singh@example.com    role: manager
+amina.bello@example.com    role: member
+ben.carter@example.com     role: member
+diego.ramos@example.com    role: member
+```
+
+All seed users use this password:
+
+```text
+Password1
+```
+
 ### 8. Run the server
 
 ```powershell
@@ -187,10 +234,19 @@ http://127.0.0.1:8000/docs
 
 ## API Endpoints
 
+### Auth
+
+```http
+POST /auth/register
+POST /auth/login
+POST /auth/refresh
+POST /auth/logout
+GET /auth/me
+```
+
 ### Users
 
 ```http
-POST /users/register
 GET /users/
 GET /users/{user_id}
 GET /users/{user_id}/projects
@@ -229,6 +285,123 @@ Task assignment request body:
 }
 ```
 
+## Authentication
+
+### Register
+
+Create a user with:
+
+```http
+POST /auth/register
+```
+
+Request body:
+
+```json
+{
+  "name": "Amina Bello",
+  "email": "amina@example.com",
+  "password": "Password1"
+}
+```
+
+New users are created as `member` by default. Public registration does not allow clients to choose their own role.
+
+### Login
+
+Login uses OAuth2 password form data:
+
+```http
+POST /auth/login
+```
+
+Form fields:
+
+```text
+username=admin@example.com
+password=Password1
+```
+
+Successful login returns:
+
+```json
+{
+  "access_token": "jwt_access_token",
+  "refresh_token": "random_refresh_token",
+  "token_type": "bearer"
+}
+```
+
+The access token expires quickly, by default after 15 minutes. The refresh token lasts longer, by default 7 days, and is stored in the database as a hash.
+
+### Use Protected Routes
+
+Send the access token in the `Authorization` header:
+
+```http
+Authorization: Bearer jwt_access_token
+```
+
+In Swagger UI, click `Authorize`, enter the login `username` and `password`, then close the modal. Swagger calls `/auth/login` and stores the access token for protected endpoints.
+
+### Refresh Tokens
+
+When the access token expires, request a new token pair:
+
+```http
+POST /auth/refresh
+```
+
+Request body:
+
+```json
+{
+  "refresh_token": "current_refresh_token"
+}
+```
+
+The API returns a new access token and a new refresh token. The old refresh token is deleted from the database during rotation, so it cannot be reused.
+
+### Logout
+
+Logout revokes the refresh token:
+
+```http
+POST /auth/logout
+```
+
+Request body:
+
+```json
+{
+  "refresh_token": "current_refresh_token"
+}
+```
+
+Successful logout returns `204 No Content`. Existing access tokens may continue working until they expire, but the revoked refresh token can no longer create new access tokens.
+
+## Role Permissions
+
+The API uses role-based access control through `admin`, `manager`, and `member` roles.
+
+| Role | Permissions |
+| --- | --- |
+| `admin` | Can read users, manage all projects, manage all tasks, and assign tasks. |
+| `manager` | Can read users, create projects, modify projects they own, manage tasks in projects they own, and assign tasks. |
+| `member` | Can read projects, create tasks, read assigned tasks, and update assigned tasks. Members cannot delete tasks or projects. |
+
+Examples:
+
+```text
+Admin deletes any project: allowed
+Manager updates own project: allowed
+Manager updates another user's project: forbidden
+Member updates assigned task: allowed
+Member deletes a project: forbidden
+```
+
+Auth failures return `401 Unauthorized`. Permission failures return `403 Forbidden`.
+
 ## Task Query Parameters
 
 Filtering:
@@ -265,7 +438,8 @@ Create a user:
 ```json
 {
   "name": "Amina Bello",
-  "email": "amina@example.com"
+  "email": "amina@example.com",
+  "password": "Password1"
 }
 ```
 
@@ -274,8 +448,7 @@ Create a project:
 ```json
 {
   "name": "Customer Portal API",
-  "description": "Backend API for customer profile and task tracking.",
-  "owner_id": 1
+  "description": "Backend API for customer profile and task tracking."
 }
 ```
 
@@ -287,8 +460,7 @@ Create a task:
   "description": "Create the project detail endpoint with nested tasks.",
   "priority": 4,
   "status": "pending",
-  "due_date": "2026-05-30",
-  "owner_id": 1,
+  "due_date": "2026-08-30",
   "project_id": 1
 }
 ```
@@ -299,6 +471,9 @@ Create a task:
 - Duplicate user emails return `409 Conflict`.
 - Missing users, projects, or tasks return `404 Not Found`.
 - Invalid request bodies return `422 Unprocessable Entity`.
+- Missing or invalid access tokens return `401 Unauthorized`.
+- Authenticated users without permission return `403 Forbidden`.
+- Too many auth requests return `429 Too Many Requests`.
 - Database constraint problems return clear API errors where handled.
 
 Common status codes:
@@ -307,8 +482,11 @@ Common status codes:
 200 OK
 201 Created
 204 No Content
+401 Unauthorized
+403 Forbidden
 404 Not Found
 409 Conflict
+429 Too Many Requests
 422 Unprocessable Entity
 ```
 
@@ -371,4 +549,3 @@ Screenshots from endpoint testing are stored in the `assets/` folder.
 ### Error Cases
 
 ![Duplicate email error](assets/test_error_cases/post_user_existing_email.png)
-

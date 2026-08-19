@@ -49,7 +49,14 @@ def require_permission(resource: Resource, action: Action):
     async def permission_checker(
         current_user: User = Depends(get_current_user),
     ) -> User:
-        role = UserRole(current_user.role)
+        try:
+            role = UserRole(current_user.role)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not permitted",
+            )
+
         allowed_actions = PERMISSIONS.get(role, {}).get(resource, set())
 
         if action not in allowed_actions:
