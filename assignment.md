@@ -497,6 +497,7 @@ Stack dependencies: Depends(require_role("admin", "manager")) on specific routes
 Implement rules: admins can delete any project, managers can only modify their own, members can only update assigned tasks
 Create a permissions matrix and test EVERY combination (3 roles × all CRUD operations)
 Ensure error messages are generic: don’t reveal “user not found” vs “wrong password” (always “Invalid credentials”)
+
 🤖 AI Prompt
 "I have 3 roles: admin, manager, member. Help me build a permissions matrix showing exactly what each role can do for Users, Projects, and Tasks. Then show me the FastAPI dependency that enforces this cleanly."
 

@@ -1,0 +1,775 @@
+{
+  "info": {
+    "name": "Day 27 - Auth and RBAC Tests",
+    "_postman_id": "7f36f1f0-d7aa-4c11-85d2-2a9cc3b5a2f1",
+    "description": "Postman collection for testing Day 27 auth flow, refresh-token rotation, logout, RBAC, and security edge cases.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000"
+    },
+    {
+      "key": "seed_password",
+      "value": "Password1"
+    },
+    {
+      "key": "admin_email",
+      "value": "admin@example.com"
+    },
+    {
+      "key": "manager_email",
+      "value": "chloe.singh@example.com"
+    },
+    {
+      "key": "member_email",
+      "value": "amina.bello@example.com"
+    },
+    {
+      "key": "owned_project_id",
+      "value": "1"
+    },
+    {
+      "key": "other_project_id",
+      "value": "2"
+    },
+    {
+      "key": "assigned_task_id",
+      "value": "1"
+    },
+    {
+      "key": "other_task_id",
+      "value": "2"
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth Flow",
+      "item": [
+        {
+          "name": "Register New Member",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Postman Member\",\n  \"email\": \"postman.member.{{$timestamp}}@example.com\",\n  \"password\": \"Password1\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/register",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('register returns 201 Created', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('registered user defaults to member role', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.role).to.eql('member');",
+                  "});",
+                  "",
+                  "pm.test('password hash is not exposed', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.not.have.property('password_hash');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login Admin",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "username",
+                  "value": "{{admin_email}}",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "{{seed_password}}",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('admin login returns 200 OK', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('admin_access_token', body.access_token);",
+                  "pm.collectionVariables.set('admin_refresh_token', body.refresh_token);",
+                  "",
+                  "pm.test('admin login returns access and refresh tokens', function () {",
+                  "  pm.expect(body.access_token).to.be.a('string').and.not.empty;",
+                  "  pm.expect(body.refresh_token).to.be.a('string').and.not.empty;",
+                  "  pm.expect(body.token_type).to.eql('bearer');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login Manager",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "username",
+                  "value": "{{manager_email}}",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "{{seed_password}}",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('manager login returns 200 OK', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('manager_access_token', body.access_token);",
+                  "pm.collectionVariables.set('manager_refresh_token', body.refresh_token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login Member",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "username",
+                  "value": "{{member_email}}",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "{{seed_password}}",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('member login returns 200 OK', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('member_access_token', body.access_token);",
+                  "pm.collectionVariables.set('member_refresh_token', body.refresh_token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Current Admin",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/auth/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "me"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('admin can access /auth/me', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('/auth/me returns admin role', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.email).to.eql(pm.collectionVariables.get('admin_email'));",
+                  "  pm.expect(body.role).to.eql('admin');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refresh Admin Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{admin_refresh_token}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/refresh",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "refresh"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('refresh returns new token pair', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const oldRefreshToken = pm.collectionVariables.get('admin_refresh_token');",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('old_admin_refresh_token', oldRefreshToken);",
+                  "pm.collectionVariables.set('admin_access_token', body.access_token);",
+                  "pm.collectionVariables.set('admin_refresh_token', body.refresh_token);",
+                  "",
+                  "pm.test('refresh token rotated', function () {",
+                  "  pm.expect(body.refresh_token).to.not.eql(oldRefreshToken);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Old Refresh Token Reuse Fails",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{old_admin_refresh_token}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/refresh",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "refresh"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('old refresh token is rejected after rotation', function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Logout Admin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{admin_refresh_token}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/logout",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "logout"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('logout returns 204 No Content', function () {",
+                  "  pm.response.to.have.status(204);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Logged Out Refresh Token Fails",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{admin_refresh_token}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/refresh",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "refresh"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('logged out refresh token is rejected', function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "RBAC Tests",
+      "description": "These tests assume the seed script has been run and the project/task ids match the collection variables.",
+      "item": [
+        {
+          "name": "Member Cannot Delete Project",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{member_access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/projects/{{owned_project_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "projects",
+                "{{owned_project_id}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('member delete project is forbidden', function () {",
+                  "  pm.response.to.have.status(403);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Manager Cannot Update Another User Project",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{manager_access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Blocked Manager Update\",\n  \"description\": \"This should fail because the manager does not own this project.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/projects/{{other_project_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "projects",
+                "{{other_project_id}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('manager update other project is forbidden', function () {",
+                  "  pm.response.to.have.status(403);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Member Can Update Assigned Task",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{member_access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Updated assigned task\",\n  \"description\": \"Member can update a task assigned to them.\",\n  \"priority\": 4,\n  \"status\": \"in_progress\",\n  \"due_date\": \"2026-08-30\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/tasks/{{assigned_task_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "tasks",
+                "{{assigned_task_id}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('member can update assigned task', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Member Cannot Update Another User Task",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{member_access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Blocked task update\",\n  \"description\": \"This should fail because the task is not assigned to this member.\",\n  \"priority\": 3,\n  \"status\": \"pending\",\n  \"due_date\": \"2026-08-30\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/tasks/{{other_task_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "tasks",
+                "{{other_task_id}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('member update other task is forbidden', function () {",
+                  "  pm.response.to.have.status(403);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Member Cannot Delete Task",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{member_access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/tasks/{{assigned_task_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "tasks",
+                "{{assigned_task_id}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('member delete task is forbidden', function () {",
+                  "  pm.response.to.have.status(403);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Security Edge Cases",
+      "item": [
+        {
+          "name": "Protected Route Without Token",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/auth/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "me"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('missing token returns 401', function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Protected Route With Tampered Token",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{member_access_token}}tampered",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/auth/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "me"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('tampered token returns 401', function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

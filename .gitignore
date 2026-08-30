@@ -4,3 +4,4 @@ decorator.pyc
 __pycache__/
 .env
 .agents/
+cors-test.html

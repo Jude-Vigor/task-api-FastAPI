@@ -525,6 +525,21 @@ The API was tested through FastAPI's interactive docs at:
 http://127.0.0.1:8000/docs
 ```
 
+The Day 27 Postman collection is stored at:
+
+```text
+postman/Day27_Auth_RBAC.postman_collection.json
+```
+
+To run it:
+
+1. Run migrations and seed the database.
+2. Start the API server at `http://127.0.0.1:8000`.
+3. Import the collection into Postman.
+4. Run the collection from top to bottom.
+
+The collection tests registration, login, protected routes, refresh-token rotation, logout, RBAC failures, missing tokens, and tampered tokens.
+
 Screenshots from endpoint testing are stored in the `assets/` folder.
 
 ## A few sample Screenshots

@@ -17,7 +17,7 @@ SECRET_KEY = cast(str, os.getenv("JWT_SECRET_KEY"))
 if not SECRET_KEY or not ALGORITHM:
     raise RuntimeError("JWT_SECRET_KEY or ALG is not set")
 
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "15"))
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "10"))
 REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7"))
 
 # Swagger will expect a login flow at the "/login" path
